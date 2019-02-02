@@ -73,14 +73,12 @@ function przygotujWiadomosc(produkt) {
 
         await browser.close();
     } catch (error) {
-        if (browser) {
-            await browser.close();
-        }
         console.error(error);
     } finally {
         if (browser) {
             await browser.close();
         }
+
         process.exit(0);
     }
 })();
