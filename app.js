@@ -38,6 +38,12 @@ function przygotujWiadomosc(produkt) {
     return wiadomoscDoWyslania;
 }
 
+function wykonajWebhook(webhook, wiadomosc) {
+    return axios.post(webhook, {
+        content: wiadomosc,
+    });
+}
+
 (async () => {
     let browser;
     try {
@@ -67,9 +73,18 @@ function przygotujWiadomosc(produkt) {
             return przecenionyProdukt;
         });
 
-        await axios.post(webhookURL, {
-            content: przygotujWiadomosc(produkt),
-        });
+
+        const wiadomosc = przygotujWiadomosc(produkt);
+
+        if (Array.isArray(webhookURL)) {
+            const wykonywaneWebhooki = [];
+            webhookURL.forEach((webhook) => {
+                wykonywaneWebhooki.push(wykonajWebhook(webhook, wiadomosc));
+            });
+            await Promise.all(wykonywaneWebhooki);
+        } else {
+            await wykonajWebhook(webhookURL, wiadomosc);
+        }
 
         await browser.close();
     } catch (error) {

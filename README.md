@@ -1,5 +1,5 @@
-Skrypt pobierający informację co aktualnie znajduje się na gorącym strzale w [x-komie](https://x-kom.pl), następnie przesyła tą informację poprzez webhooka na Discorda.
+Skrypt pobierający informację co aktualnie znajduje się na gorącym strzale w [x-komie](https://x-kom.pl), następnie przesyła tą informację poprzez webhooka na [Discorda](https://discordapp.com/).
 
-Odpalane z 'crona' o 10 i 22 wydaje się być nawet useful...
+Uruchamiane za pomocą cron'a kilka sekund po 10 i 22 wydaje się być nawet przydatne.
 
-W [configu](config.json) trzeba podać [URL Webhooka](https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks). 
+W [pliku z konfiguracją](config.json) należy podać adres URL [webhooka](https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks) lub tablicę zawierającą URL'e webhooków.  
