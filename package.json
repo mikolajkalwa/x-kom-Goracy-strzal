@@ -1,21 +1,19 @@
 {
   "name": "x-kom_goracy_strzal",
   "version": "1.0.0",
-  "description": "",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
   },
-  "keywords": [],
   "author": "Mikołaj Kalwa",
   "license": "MIT",
   "dependencies": {
     "axios": "^0.18.0",
-    "puppeteer": "^1.11.0"
+    "puppeteer": "^1.14.0"
   },
   "devDependencies": {
-    "eslint": "^5.12.0",
+    "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.14.0"
+    "eslint-plugin-import": "^2.16.0"
   }
 }
