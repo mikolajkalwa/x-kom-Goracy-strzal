@@ -1,98 +1,103 @@
-const puppeteer = require('puppeteer');
+const cheerio = require('cheerio');
 const axios = require('axios');
 
 const { webhookURL } = require('./config.json');
 
-function przygotujWiadomosc(produkt) {
-  let wiadomoscDoWyslania = '';
+const currentDate = new Date().toISOString();
 
-  Object.entries(produkt).forEach(([key, value]) => {
+function convertPriceFormat(price) {
+  return `${price},00 zł`;
+}
+
+function deleteEmptyProperties(product) {
+  Object.entries(product).forEach(([key, value]) => {
+    if (!value) {
+      // eslint-disable-next-line no-param-reassign
+      delete product[key];
+    }
+  });
+  return product;
+}
+
+function prepareMessage(product) {
+  let message = '';
+
+  Object.entries(product).forEach(([key, value]) => {
     switch (key) {
-      case 'nazwa':
-        wiadomoscDoWyslania += `**${value}**\n`;
+      case 'productName':
+        message += `**${value}**\n`;
         break;
-      case 'staraCena':
-        wiadomoscDoWyslania += `Stara cena: ${value}\n`;
+      case 'oldPrice':
+        message += `Stara cena: ${value}\n`;
         break;
-      case 'nowaCena':
-        wiadomoscDoWyslania += `Nowa cena: ${value}\n`;
+      case 'newPrice':
+        message += `Nowa cena: ${value}\n`;
         break;
-      case 'oszczedz':
-        wiadomoscDoWyslania += `Oszczędzasz: ${value}\n`;
+      case 'saving':
+        message += `Oszczędzasz: ${value}\n`;
         break;
-      case 'pozostalo':
-        wiadomoscDoWyslania += `Pozostało ${value} sztuk.\n`;
+      case 'remainingAmount':
+        message += `Pozostało ${value} sztuk.\n`;
         break;
-      case 'sprzedano':
-        wiadomoscDoWyslania += `Sprzedano już ${value} sztuk.\n`;
+      case 'soldAmount':
+        message += `Sprzedano już ${value} sztuk.\n`;
         break;
-      case 'wyprzedano':
-        wiadomoscDoWyslania += '**Wyprzedano!**\n';
+      case 'soldOut':
+        message += '**Wyprzedano!**\n';
+        break;
+      case 'productId':
+        message += `<http://x-kom.pl/p/${value}>\n`;
         break;
       default:
-        wiadomoscDoWyslania += '';
+        message += '';
     }
   });
 
-  wiadomoscDoWyslania += 'https://www.x-kom.pl/goracy_strzal/';
-  return wiadomoscDoWyslania;
+  message += 'https://www.x-kom.pl/goracy_strzal/';
+
+  return message;
 }
 
-function wykonajWebhook(webhook, wiadomosc) {
+function executeWebhook(webhook, message) {
   return axios.post(webhook, {
-    content: wiadomosc,
+    content: message,
   });
 }
 
 (async () => {
-  let browser;
   try {
-    browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    await page.goto('https://www.x-kom.pl/hot-shots/current/widget');
+    const website = await axios.get('https://www.x-kom.pl/hot-shots/current/widget');
+    const $ = cheerio.load(website.data);
 
-    const produkt = await page.evaluate(() => {
-      const przecenionyProdukt = {
-        nazwa: document.querySelector('#hotShot > div:nth-child(2) > div.col-md-12.col-sm-6.product-impression > p'),
-        staraCena: document.querySelector('#hotShot > div:nth-child(2) > div:nth-child(2) > div.clearfix.price > div.old-price'),
-        nowaCena: document.querySelector('#hotShot > div:nth-child(2) > div:nth-child(2) > div.clearfix.price > div.new-price'),
-        oszczedz: document.querySelector('#hotShot > div:nth-child(2) > div:nth-child(2) > div.clearfix.discount.hidden-md.hidden-lg > span'),
-        pozostalo: document.querySelector('#hotShot > div:nth-child(2) > div:nth-child(2) > div.clearfix.count > div.pull-left > span'),
-        sprzedano: document.querySelector('#hotShot > div:nth-child(2) > div:nth-child(2) > div.clearfix.count > div.pull-right > span'),
-        wyprzedano: document.querySelector('#hotShot > div:nth-child(2) > div:nth-child(2) > div.sold-info'),
-      };
+    const productName = $('.product-name').text();
+    const productId = $('div.col-md-12:nth-child(1)').attr('data-product-id');
+    const oldPrice = $('.old-price').text();
+    const newPrice = $('.new-price').text();
+    const remainingAmount = $('.pull-left .gs-quantity').text();
+    const soldAmount = $('.pull-right .gs-quantity').text();
+    const soldOut = $('.sold-info').text();
 
-      Object.entries(przecenionyProdukt).forEach(([key, value]) => {
-        if (value === null) {
-          delete przecenionyProdukt[key];
-        } else {
-          przecenionyProdukt[key] = value.innerText;
-        }
-      });
+    const staraCenaJakoLiczba = parseInt(oldPrice.replace(/ /g, '').slice(0, -5), 10);
+    const nowaCenaJakoLiczba = parseInt(newPrice.replace(/ /g, '').slice(0, -5), 10);
+    const saving = convertPriceFormat(staraCenaJakoLiczba - nowaCenaJakoLiczba);
 
-      return przecenionyProdukt;
-    });
+    const product = {
+      productName, oldPrice, newPrice, saving, remainingAmount, soldAmount, soldOut, productId,
+    };
 
-
-    const wiadomosc = przygotujWiadomosc(produkt);
+    const message = prepareMessage(deleteEmptyProperties(product));
 
     if (Array.isArray(webhookURL)) {
-      const wykonywaneWebhooki = [];
+      const executingWebhooks = [];
       webhookURL.forEach((webhook) => {
-        wykonywaneWebhooki.push(wykonajWebhook(webhook, wiadomosc));
+        executingWebhooks.push(executeWebhook(webhook, message));
       });
-      await Promise.all(wykonywaneWebhooki);
-    } else {
-      await wykonajWebhook(webhookURL, wiadomosc);
-    }
 
-    await browser.close();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    if (browser) {
-      await browser.close();
+      await Promise.all(executingWebhooks);
+    } else {
+      await executeWebhook(webhookURL, message);
     }
-    process.exit(0);
+  } catch (error) {
+    console.error(currentDate, error);
   }
 })();
